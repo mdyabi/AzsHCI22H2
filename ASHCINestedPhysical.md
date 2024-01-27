@@ -1,0 +1,96 @@
+# Lab Exercise: Azure Stack HCI 22H2 Deployment with Nested Virtualization
+
+Introduction
+-------------
+
+The objective of this lab exercise is to guide participants through the process of deploying Azure Stack HCI 22H2 using nested virtualization on a single physical system. 
+In this exercise, you'll walk through the steps to stand up an Azure Stack HCI 20H2 configuration, and key dependencies, all running on a single piece of physical hardware. 
+
+At a high level, this will consist of the following:
+
+* Enabling the Hyper-V role and management tools on your Windows Server 2022 or Windows 11 Pro/Enterprise/Education physical system.
+* On your Hyper-V host, deploy a Windows Server 2022 domain controller, and a Windows 11 management VM, running the Windows Admin Center
+* On your Hyper-V host, deploy 2 Azure Stack HCI 22H2 nodes with nested virtualization enabled
+* On the Windows 11 management VM, configure your Azure Stack HCI 22H2 cluster
+
+Contents
+-----------
+- [Introduction](#Introduction)
+- [Contents](#contents)
+- [Hardware requirement](#Hardware-requirement)
+- [Get an Azure subscription](#get-an-azure-subscription)
+- [Configure the Hyper-V host](#Configure-the-Hyper-V-host)
+- [Next Steps](#next-steps)
+
+
+Hardware requirement 
+---------------------
+
+For the purpose of this LAB, your minimum recommended hardware requirements are:
+
+* 64-bit Processor with Second Level Address Translation (SLAT).
+* CPU support for VM Monitor Mode Extension (VT-x on Intel CPU's).
+* 16GB memory
+* 100GB+ SSD/NVMe Storage
+
+The following items will need to be enabled in the system BIOS:
+
+* Virtualization Technology - may have a different label depending on motherboard manufacturer.
+* Hardware Enforced Data Execution Prevention.
+
+Get an Azure subscription
+------------------------
+To try out Azure Stack HCI 20H2, you'll need an Azure subscription. If your company already provided one, you can skip this step. Otherwise, you have two options.
+
+First, Visual Studio subscribers can use Azure at no extra cost. With your monthly Azure DevTest credit, you can create virtual machines and other resources. 
+The second option is to sign up for a free trial [free trial](https://azure.microsoft.com/en-us/free/ "Azure free trial link") that gives you $200 credit for the first 30 days and 12 months of free services. This trial credit is enough to test Azure Stack HCI 22H2. After deployment, you can use the same Azure subscription to register your Azure Stack HCI cluster.
+
+Configure the Hyper-V host
+----------------------------
+
+### Task 1: Enable Hyper-V Role and Configure Networking ###
+
+Open PowerShell as an **administrator** on your physical system.
+
+
+**To enable the Hyper-V role on Windows Server 2022:**
+
+```powershell
+# Install the Hyper-V role and management tools, including PowerShell
+Install-WindowsFeature -Name Hyper-V -IncludeManagementTools -Restart 
+```
+To enable Hyper-V on Windows 11
+
+```powershell
+# Install the Hyper-V role and management tools, including PowerShell
+Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
+```
+Restart the system after installing Hyper-V
+
+**Configure internal NAT virtual switch for networking:**
+
+```powershell
+# Create a new internal virtual switch on the host
+New-VMSwitch -Name "InternalNAT" -SwitchType Internal
+# Create an IP address for the NAT Gateway
+New-NetIPAddress -IPAddress 192.168.0.1 -PrefixLength 24 -InterfaceAlias "vEthernet (InternalNAT)"
+# Create the new NAT network
+New-NetNat -Name "AzSHCINAT" -InternalIPInterfaceAddressPrefix 192.168.0.0/24
+# Check the NAT configuration
+Get-NetNat
+```
+### Task 2: Enable Enhanced Session Mode
+
+Enable Enhanced Session Mode for better user experience:
+
+```powershell
+Set-VMhost -EnableEnhancedSessionMode $True
+```
+
+Next Steps
+-----------
+In this step, you've successfully configured your Hyper-V host, and the required core networking to support the nested scenario.  You're now ready to start creating your virtual machines as part of deploying your management infrastructure. 
+You have 2 choices on how to proceed, either using a GUI or via PowerShell:
+
+* [**Part 2a** - Deploy your management infrastructure with the GUI](/archive/steps/2a_ManagementInfraGUI.md "Deploy your management infrastructure with the GUI")
+* [**Part 2b** - Deploy your management infrastructure with PowerShell](/archive/steps/2b_ManagementInfraPS.md "Deploy your management infrastructure with PowerShell")
