@@ -1,0 +1,156 @@
+# Lab: Deploy Management Infrastructure with the GUI
+
+overview: 
+With your Hyper-V host up and running, it's time to deploy the core management infrastructure to support the Azure Stack HCI 22H2 deployment in a future step.
+In this lab, you'll use the GUI (Graphical User Interface) to create resources. 
+If you prefer to use PowerShell, you can refer to the PowerShell guide.
+
+Contents
+-----------
+- [Overview](#overview)
+- [Contents](#contents)
+- [Architecture](#architecture)
+- [Download artifacts](#download-artifacts)
+- [Create your domain controller](#create-your-domain-controller)
+- [Create your Windows 11 Management VM](#create-your-windows-11-management-vm)
+- [Next Steps](#next-steps)
+
+
+Architecture
+-----------
+
+As shown on the architecture graphic below, the core management infrastructure consists of a Windows Server 2019 domain controller VM, along with a Windows 10 Enterprise VM, which will run the Windows Admin Center.  In this step, you'll deploy both of those key components.
+
+![Architecture diagram for Azure Stack HCI 20H2 nested with management infra highlighted](/archive/media/nested_virt_mgmt_ga.png "Architecture diagram for Azure Stack HCI 20H2 nested with management infra highlighted")
+
+However, before you deploy your management infrastructure, first, you need to download the necessary software components required to complete this evalution.
+
+Download artifacts
+-----------
+In order to deploy our nested virtual machines on AzSHCIHost001, we'll first need to download the appropriate ISOs and files for the following operating systems:
+
+1. Visit [https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022](https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022), complete the registration form, and download the ISO.  Save the file as **WS2022.iso** to C:\ISO
+2. Visit [https://www.microsoft.com/en-us/evalcenter/evaluate-windows-11-pro](https://www.microsoft.com/software-download/windows11), complete the registration form, and download the x64 ISO.  Save the file as **W11.iso** to C:\ISO
+3. Visit [https://azure.microsoft.com/en-us/products/azure-stack/hci/hci-download](https://learn.microsoft.com/en-us/azure-stack/hci/deploy/download-azure-stack-hci-software), complete the registration form, and download the ISO.  Save the file as **AzSHCI.iso** to C:\ISO
+4. Visit https://aka.ms/wacdownload to download the executables for the Windows Admin Center.  Save it as **WindowsAdminCenter.msi**, also in C:\ISO
+
+Create Your Domain Controller
+-----------------------------
+**Step 1: Create the DC01 VM using Hyper-V Manager**
+
+Open Hyper-V Manager on your Hyper-V host.  
+Under Actions, click New, then Virtual Machine.  
+Follow the steps in the wizard to create a VM named DC01 with the specified settings.  
+* Generation: 2  
+* Memory: 4GB (Dynamic Memory enabled)  
+* Networking: InternalNAT    
+* Virtual Hard Disk Size: 30GB  
+
+Installation Options: Install Windows Server 2022 from the ISO file (WS2022.iso)  
+After creating the VM, update its memory settings and disable automatic checkpoints if on a Windows 11 Hyper-V host.  
+Start the VM and boot from the ISO file to begin the Windows Server 2022 installation.  
+
+**Step 2: Complete the Out of Box Experience (OOBE)**  
+Follow the Windows Server 2022 installation process.
+Configure settings during the OOBE, including language, time, region, and password for the administrator account.
+
+**Step 3: Configure the Domain Controller with AD and DNS Roles**  
+Configure networking settings on DC01, including the computer name and IP address.
+Optionally, update DC01 with the latest Windows Updates.
+Configure DC01 with Active Directory Domain Services and DNS roles.
+Add an additional domain administrative account.
+
+#### Configure the networking and host name on DC01 ####
+Firstly, you will configure the networking inside the VM and rename the OS, before rebooting.
+
+1. In **Server Manager**, from the **Dashboard**, click on **Configure this local server**
+2. In the **Properties** window, next to **Computer name**, click on your current randomly generated computer name
+3. In the **System properties** window, click **Change** and change the computer name to **DC01**, then click **OK**
+4. Click **OK** again to close the notification, then click **Close**, and choose **Restart Later**
+5. Back in the **Properties** window, next to **Ethernet**, click on **IPv4 address assigned by DHCP, IPv6 enabled**
+6. In the **Network Connections** window, right-click on the **Ethernet** adapter and select **Properties**
+7. Click on **Internet Protocol Version 4 (TCP/IPv4)**, and click **Properties**
+8. Enter the following information, then click **OK**, and then **Close**
+
+   * IP address: 192.168.0.2
+   * Subnet mask: 255.255.255.0
+   * Default gateway: 192.168.0.1
+   * Preferred DNS server: 1.1.1.1
+   * Alternate DNS server: 1.0.0.1
+
+#### Configure the Active Directory role on DC01 ####
+With the OS configured, you can now move on to configuring the Windows Server 2022 OS with the appropriate roles and features to support the domain infrastructure.
+
+#### Add additional domain administrative account ####
+
+Rather than use the main domain admin account, we'll add an additional administrative user to work with going forward. Once DC01 has finished rebooting, log in with the new domain admin account:
+
+* Username: azshci\administrator
+* Password: admin-password-you-entered-earlier
+
+1. Once logged into DC01 with the domain admin account, click **Start** and search for "users"
+2. In the results, click on **Active Directory Users and Computers**
+3. In the **Active Directory Users and Computers** window, expand the **azshci.local domain** right-click on the **Users** OU, select **New** then **User**.  Enter the following details, then click **Next**
+
+   * First name: Lab
+   * Last name: Admin
+   * Full name: Lab Admin
+   * User logon name: labadmin
+
+4. Provide a password for this new account, and **tick the Password never expires** box, then click **Next**, then click **Finish**
+5. Click on the **Users** OU, and find the new **Lab Admin** account
+6. Right-click the **Lab Admin** account, and click **Add to a group...**
+7. In the **Select Groups** window, in the **Enter the object names to select** box, enter **Domain Admins**, **Schema Admins** and **Enterprise Admins**, clicking **Check Names** after each one, then click **OK**, then **OK** to close the confirmation popup
+
+
+
+Create Your Windows 11 Management VM
+-------------------------------------
+
+**Step 1: Create the MGMT01 VM using Hyper-V Manager**    
+Open Hyper-V Manager on your Hyper-V host.
+Under Actions, click New, then Virtual Machine.
+Follow the steps in the wizard to create a VM named MGMT01 with the specified settings.
+* Generation: 2  
+* Memory: 4GB (Dynamic Memory enabled)  
+* Networking: InternalNAT  
+* Virtual Hard Disk Size: 127GB  
+
+Installation Options: Install Windows 11 Pro from the ISO file (W11.iso)  
+After creating the VM, update its memory settings and disable automatic checkpoints if on a Windows 11 Hyper-V host.  
+Start the VM and boot from the ISO file to begin the Windows 11 installation.  
+
+**Step 2: Complete the Out of Box Experience (OOBE)**  
+Follow the Windows 10 installation process.  
+Configure settings during the OOBE, including language, time, region, username, and password.  
+
+**Step 3: Configure MGMT01 Networking**  
+Configure networking settings on MGMT01, including the IP address.  
+
+1. In the bottom-right corner, right-click the NIC icon, and select **Open Network & Internet settings**
+
+![Select NIC](/archive/media/nic_adapter.png "Select NIC")
+
+2. In the **Settings** window, click on **Ethernet** and then click on the **Ethernet adapter** shown in the central window
+3. Under **IP settings**, click **Edit**, then enter the following information, then click **Save** and close **Settings**
+   * Manual
+   * IPv4: On
+   * IP address: 192.168.0.3
+   * Subnet prefix length: 24
+   * Gateway: 192.168.0.1
+   * Preferred DNS: 192.168.0.2
+
+Optionally, install the new Microsoft Edge browser.    
+Optionally, update the Windows 11 OS.    
+
+**Step 4: Join Your Windows 11 VM to the Domain**  
+Use sysdm.cpl to join MGMT01 to the azshci.local domain.  
+Reboot MGMT01 when prompted.  
+
+**Step 5: Install Windows Admin Center on Windows 11**  
+Copy the Windows Admin Center executable to MGMT01's desktop.  
+Double-click the executable and follow the installation steps.  
+Open Windows Admin Center on MGMT01.  
+
+## Next Steps
+Proceed to create your nested Azure Stack HCI 20H2 nodes with the GUI.
